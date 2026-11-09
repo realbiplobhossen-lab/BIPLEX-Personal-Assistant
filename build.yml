@@ -1,0 +1,63 @@
+name: BIPLEX Personal Assistant APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate Android project files
+        run: flutter create --platforms=android --org com.biplob --project-name biplex_assistant .
+
+      - name: Install native Android files
+        run: |
+          cp native/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/kotlin/com/biplob/biplex_assistant
+          cp native/kotlin/com/biplob/biplex_assistant/*.kt android/app/src/main/kotlin/com/biplob/biplex_assistant/
+
+      - name: Configure Android application
+        run: |
+          sed -i 's/namespace = ".*"/namespace = "com.biplob.biplex_assistant"/' android/app/build.gradle.kts
+          sed -i 's/applicationId = ".*"/applicationId = "com.biplob.biplex_assistant"/' android/app/build.gradle.kts
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts
+
+      - name: Get Flutter packages
+        run: flutter pub get
+
+      - name: Analyze Flutter code
+        run: flutter analyze
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BIPLEX-Personal-Assistant-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
